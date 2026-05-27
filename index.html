@@ -15,15 +15,40 @@ body{
 
 /* HEADER */
 header{
-    padding:20px;
+    padding:18px;
     font-size:22px;
     font-weight:bold;
     background:#111827;
-    position:sticky;
-    top:0;
 }
 
-/* LAYOUT */
+/* ADD BAR */
+.addBar{
+    padding:15px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    background:#0f172a;
+}
+
+.addBar input, .addBar select{
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    background:#1f2937;
+    color:white;
+}
+
+.addBar button{
+    padding:10px 15px;
+    border:none;
+    border-radius:8px;
+    background:#3b82f6;
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+/* SECTIONS */
 .section{
     padding:20px;
 }
@@ -35,8 +60,8 @@ h2{
 /* GRID */
 .grid{
     display:flex;
-    gap:15px;
     flex-wrap:wrap;
+    gap:15px;
 }
 
 /* CARDS */
@@ -44,8 +69,8 @@ h2{
     width:180px;
     background:#1f2937;
     border-radius:12px;
-    overflow:hidden;
     cursor:pointer;
+    overflow:hidden;
     transition:0.2s;
 }
 
@@ -80,7 +105,7 @@ h2{
     display:none;
 }
 
-input,textarea,select{
+.panel input{
     width:100%;
     padding:8px;
     margin:6px 0;
@@ -90,23 +115,23 @@ input,textarea,select{
     color:white;
 }
 
-button{
+.panel button{
     width:100%;
     padding:10px;
+    margin-top:6px;
     border:none;
     border-radius:8px;
     background:#3b82f6;
     color:white;
     font-weight:bold;
-    margin-top:6px;
-    cursor:pointer;
 }
 
 .episode{
     background:#1f2937;
     padding:10px;
-    border-radius:10px;
     margin-top:8px;
+    border-radius:10px;
+    font-size:13px;
 }
 </style>
 </head>
@@ -115,17 +140,31 @@ button{
 
 <header>🎬 Studio+</header>
 
+<!-- ADD BAR -->
+<div class="addBar">
+<select id="type">
+<option value="show">Show</option>
+<option value="movie">Movie</option>
+</select>
+
+<input id="title" placeholder="Title">
+
+<button onclick="create()">Create</button>
+</div>
+
+<!-- SHOWS -->
 <div class="section">
 <h2>📺 Shows</h2>
 <div class="grid" id="shows"></div>
 </div>
 
+<!-- MOVIES -->
 <div class="section">
 <h2>🎞 Movies</h2>
 <div class="grid" id="movies"></div>
 </div>
 
-<!-- SIDE PANEL -->
+<!-- PANEL -->
 <div class="panel" id="panel">
 
 <h3 id="panelTitle"></h3>
@@ -134,39 +173,55 @@ button{
 
 <hr>
 
-<h4>Add Episode / Season</h4>
+<h4>Add Episode</h4>
 
 <input id="season" type="number" placeholder="Season">
 <input id="episode" type="number" placeholder="Episode">
 <input id="epTitle" placeholder="Episode Title">
-
 <input type="file" id="video" accept="video/*">
 
-<button onclick="addEpisode()">Add</button>
+<button onclick="addEpisode()">Add Episode</button>
 <button onclick="closePanel()" style="background:#ef4444;">Close</button>
 
 </div>
 
 <script>
 
-let data = JSON.parse(localStorage.getItem("studio2")) || [];
+let data = JSON.parse(localStorage.getItem("studio3")) || [];
 let currentShow = null;
 
 function save(){
-    localStorage.setItem("studio2", JSON.stringify(data));
+    localStorage.setItem("studio3", JSON.stringify(data));
+}
+
+/* CREATE MOVIE OR SHOW */
+function create(){
+
+    const item = {
+        id: Date.now(),
+        type: type.value,
+        title: title.value,
+        episodes: []
+    };
+
+    data.push(item);
+    save();
+    render();
+
+    title.value = "";
 }
 
 /* RENDER HOME */
 function render(){
+
+    const shows = data.filter(x => x.type === "show");
+    const movies = data.filter(x => x.type === "movie");
 
     const showsDiv = document.getElementById("shows");
     const moviesDiv = document.getElementById("movies");
 
     showsDiv.innerHTML = "";
     moviesDiv.innerHTML = "";
-
-    const shows = data.filter(x => x.type === "show");
-    const movies = data.filter(x => x.type === "movie");
 
     shows.forEach(show => {
         const div = document.createElement("div");
@@ -176,7 +231,7 @@ function render(){
             <div class="thumb"></div>
             <div class="card-content">
                 <b>${show.title}</b>
-                <div class="small">${show.episodes?.length || 0} episodes</div>
+                <div class="small">${show.episodes.length} episodes</div>
             </div>
         `;
 
@@ -213,16 +268,15 @@ function openShow(id){
     renderEpisodes();
 }
 
-/* SHOW EPISODES */
+/* EPISODES */
 function renderEpisodes(){
 
     const box = document.getElementById("episodes");
     box.innerHTML = "";
 
-    if(!currentShow.episodes) currentShow.episodes = [];
-
     currentShow.episodes.forEach(ep => {
         const div = document.createElement("div");
+
         div.className = "episode";
 
         div.innerHTML = `
@@ -238,19 +292,18 @@ function renderEpisodes(){
 function addEpisode(){
 
     const file = document.getElementById("video").files[0];
+    if(!file) return alert("Add video");
 
     const reader = new FileReader();
 
     reader.onload = function(){
 
-        const ep = {
+        currentShow.episodes.push({
             season: season.value,
             episode: episode.value,
             title: epTitle.value,
             video: reader.result
-        };
-
-        currentShow.episodes.push(ep);
+        });
 
         save();
         renderEpisodes();
@@ -262,13 +315,12 @@ function addEpisode(){
     reader.readAsDataURL(file);
 }
 
-/* CLOSE PANEL */
+/* CLOSE */
 function closePanel(){
-    document.getElementById("panel").style.display = "none";
+    panel.style.display = "none";
     currentShow = null;
 }
 
-/* INIT */
 render();
 
 </script>
