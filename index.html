@@ -1,42 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Private Studio Pro</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio+</title>
 
 <style>
 body{
     margin:0;
     font-family:Arial;
-    background:#0f172a;
+    background:#0b0f19;
     color:white;
+}
+
+/* HEADER */
+header{
+    padding:20px;
+    font-size:22px;
+    font-weight:bold;
+    background:#111827;
+    position:sticky;
+    top:0;
+}
+
+/* LAYOUT */
+.section{
     padding:20px;
 }
 
-h1{margin-bottom:5px;}
-p{color:#94a3b8;}
-
-.container{
-    display:grid;
-    grid-template-columns:320px 1fr;
-    gap:20px;
-    margin-top:20px;
+h2{
+    margin-bottom:10px;
 }
 
-.panel{
-    background:#1e293b;
-    padding:15px;
+/* GRID */
+.grid{
+    display:flex;
+    gap:15px;
+    flex-wrap:wrap;
+}
+
+/* CARDS */
+.card{
+    width:180px;
+    background:#1f2937;
     border-radius:12px;
+    overflow:hidden;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+.card:hover{
+    transform:scale(1.05);
+}
+
+.thumb{
+    height:100px;
+    background:linear-gradient(135deg,#3b82f6,#9333ea);
+}
+
+.card-content{
+    padding:10px;
+}
+
+.small{
+    font-size:12px;
+    color:#9ca3af;
+}
+
+/* PANEL */
+.panel{
+    position:fixed;
+    right:0;
+    top:0;
+    width:320px;
+    height:100%;
+    background:#111827;
+    padding:15px;
+    overflow:auto;
+    display:none;
 }
 
 input,textarea,select{
     width:100%;
-    padding:10px;
-    margin:8px 0 12px;
+    padding:8px;
+    margin:6px 0;
     border-radius:8px;
     border:none;
-    background:#334155;
+    background:#374151;
     color:white;
 }
 
@@ -48,202 +98,179 @@ button{
     background:#3b82f6;
     color:white;
     font-weight:bold;
+    margin-top:6px;
     cursor:pointer;
 }
 
-button:hover{background:#2563eb;}
-
-.catalog{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-    gap:15px;
-}
-
-.card{
-    background:#1e293b;
-    border-radius:12px;
-    overflow:hidden;
-}
-
-video{
-    width:100%;
-    max-height:200px;
-    background:black;
-}
-
-.card-content{
+.episode{
+    background:#1f2937;
     padding:10px;
-}
-
-.tag{
-    background:#22c55e;
-    display:inline-block;
-    padding:4px 8px;
-    border-radius:999px;
-    font-size:12px;
-    margin-bottom:5px;
-}
-
-.ep{
-    background:#334155;
-    padding:8px;
-    border-radius:8px;
-    margin-top:8px;
-    font-size:13px;
-}
-
-.delete{
-    background:#ef4444;
+    border-radius:10px;
     margin-top:8px;
 }
 </style>
 </head>
+
 <body>
 
-<h1>🎬 Private Studio Pro</h1>
-<p>Everything is stored locally using IndexedDB (supports bigger files).</p>
+<header>🎬 Studio+</header>
 
-<div class="container">
+<div class="section">
+<h2>📺 Shows</h2>
+<div class="grid" id="shows"></div>
+</div>
 
-<div class="panel">
-<h3>Create</h3>
+<div class="section">
+<h2>🎞 Movies</h2>
+<div class="grid" id="movies"></div>
+</div>
 
-<select id="type">
-<option value="movie">Movie</option>
-<option value="show">Show</option>
-</select>
+<!-- SIDE PANEL -->
+<div class="panel" id="panel">
 
-<input id="title" placeholder="Title">
-<textarea id="desc" placeholder="Description"></textarea>
+<h3 id="panelTitle"></h3>
 
-<input type="file" id="video" accept="video/*">
+<div id="episodes"></div>
 
-<div id="showBox" style="display:none;">
+<hr>
+
+<h4>Add Episode / Season</h4>
+
 <input id="season" type="number" placeholder="Season">
 <input id="episode" type="number" placeholder="Episode">
 <input id="epTitle" placeholder="Episode Title">
-</div>
 
-<button onclick="save()">Save</button>
-</div>
+<input type="file" id="video" accept="video/*">
 
-<div>
-<h3>Your Catalog</h3>
-<div class="catalog" id="catalog"></div>
-</div>
+<button onclick="addEpisode()">Add</button>
+<button onclick="closePanel()" style="background:#ef4444;">Close</button>
 
 </div>
 
 <script>
-// ---------------- INDEXEDDB SETUP ----------------
-let db;
 
-const request = indexedDB.open("studioDB", 1);
+let data = JSON.parse(localStorage.getItem("studio2")) || [];
+let currentShow = null;
 
-request.onupgradeneeded = e => {
-    db = e.target.result;
-    db.createObjectStore("videos", { keyPath: "id" });
-};
-
-request.onsuccess = e => {
-    db = e.target.result;
-    load();
-};
-
-// ---------------- UI ----------------
-document.getElementById("type").onchange = e => {
-    document.getElementById("showBox").style.display =
-        e.target.value === "show" ? "block" : "none";
-};
-
-// ---------------- SAVE ----------------
 function save(){
-    const file = document.getElementById("video").files[0];
-    if(!file) return alert("Add video");
-
-    const reader = new FileReader();
-
-    reader.onload = function(){
-        const data = {
-            id: Date.now(),
-            type: type.value,
-            title: title.value,
-            desc: desc.value,
-            video: reader.result
-        };
-
-        if(type.value === "show"){
-            data.season = season.value;
-            data.episode = episode.value;
-            data.epTitle = epTitle.value;
-        }
-
-        const tx = db.transaction("videos","readwrite");
-        tx.objectStore("videos").put(data);
-
-        tx.oncomplete = () => {
-            load();
-            alert("Saved!");
-        };
-    };
-
-    reader.readAsDataURL(file);
+    localStorage.setItem("studio2", JSON.stringify(data));
 }
 
-// ---------------- LOAD ----------------
-function load(){
-    const tx = db.transaction("videos","readonly");
-    const store = tx.objectStore("videos");
+/* RENDER HOME */
+function render(){
 
-    const req = store.getAll();
+    const showsDiv = document.getElementById("shows");
+    const moviesDiv = document.getElementById("movies");
 
-    req.onsuccess = () => {
-        render(req.result);
-    };
-}
+    showsDiv.innerHTML = "";
+    moviesDiv.innerHTML = "";
 
-// ---------------- DELETE ----------------
-function del(id){
-    const tx = db.transaction("videos","readwrite");
-    tx.objectStore("videos").delete(id);
-    tx.oncomplete = load;
-}
+    const shows = data.filter(x => x.type === "show");
+    const movies = data.filter(x => x.type === "movie");
 
-// ---------------- RENDER ----------------
-function render(items){
-    const box = document.getElementById("catalog");
-    box.innerHTML = "";
-
-    if(items.length === 0){
-        box.innerHTML = "<p>No content yet.</p>";
-        return;
-    }
-
-    items.reverse().forEach(i => {
-
+    shows.forEach(show => {
         const div = document.createElement("div");
         div.className = "card";
 
         div.innerHTML = `
-            <video controls src="${i.video}"></video>
+            <div class="thumb"></div>
             <div class="card-content">
-                <div class="tag">${i.type.toUpperCase()}</div>
-                <h3>${i.title}</h3>
-                <p>${i.desc}</p>
-
-                ${i.type==="show" ? `
-                <div class="ep">
-                    Season ${i.season} • Episode ${i.episode}<br>
-                    ${i.epTitle || ""}
-                </div>` : ""}
-
-                <button class="delete" onclick="del(${i.id})">Delete</button>
+                <b>${show.title}</b>
+                <div class="small">${show.episodes?.length || 0} episodes</div>
             </div>
+        `;
+
+        div.onclick = () => openShow(show.id);
+
+        showsDiv.appendChild(div);
+    });
+
+    movies.forEach(movie => {
+        const div = document.createElement("div");
+        div.className = "card";
+
+        div.innerHTML = `
+            <div class="thumb"></div>
+            <div class="card-content">
+                <b>${movie.title}</b>
+                <div class="small">Movie</div>
+            </div>
+        `;
+
+        moviesDiv.appendChild(div);
+    });
+}
+
+/* OPEN SHOW */
+function openShow(id){
+
+    currentShow = data.find(x => x.id === id);
+
+    document.getElementById("panelTitle").innerText = currentShow.title;
+
+    document.getElementById("panel").style.display = "block";
+
+    renderEpisodes();
+}
+
+/* SHOW EPISODES */
+function renderEpisodes(){
+
+    const box = document.getElementById("episodes");
+    box.innerHTML = "";
+
+    if(!currentShow.episodes) currentShow.episodes = [];
+
+    currentShow.episodes.forEach(ep => {
+        const div = document.createElement("div");
+        div.className = "episode";
+
+        div.innerHTML = `
+            <b>S${ep.season} E${ep.episode}</b><br>
+            ${ep.title}
         `;
 
         box.appendChild(div);
     });
 }
+
+/* ADD EPISODE */
+function addEpisode(){
+
+    const file = document.getElementById("video").files[0];
+
+    const reader = new FileReader();
+
+    reader.onload = function(){
+
+        const ep = {
+            season: season.value,
+            episode: episode.value,
+            title: epTitle.value,
+            video: reader.result
+        };
+
+        currentShow.episodes.push(ep);
+
+        save();
+        renderEpisodes();
+        render();
+
+        alert("Episode added!");
+    };
+
+    reader.readAsDataURL(file);
+}
+
+/* CLOSE PANEL */
+function closePanel(){
+    document.getElementById("panel").style.display = "none";
+    currentShow = null;
+}
+
+/* INIT */
+render();
+
 </script>
 
 </body>
